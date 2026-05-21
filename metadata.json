@@ -1,0 +1,5 @@
+{
+  "name": "BookBot MVP",
+  "description": "Универсальная система онлайн-записи и CRM для малого бизнеса с маркетплейсом и Telegram-уведомлениями.",
+  "requestFramePermissions": []
+}

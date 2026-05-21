@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      // Only initialize OneSignal on allowed domains or ignore the domain restriction error
+      if (window.location.hostname.includes('ai.studio') || window.location.hostname.includes('run.app')) {
+        OneSignalDeferred.push(async function(OneSignal) {
+          try {
+            await OneSignal.init({
+              appId: "243da423-3853-4e70-8095-ae94ea18503d",
+              safari_web_id: "web.onesignal.auto.1ee85315-99d2-4859-abe2-d0d2d86b4cd7",
+              notifyButton: {
+                enable: true,
+              },
+              promptOptions: {
+                slidedown: {
+                  prompts: [
+                    {
+                      type: "push",
+                      autoPrompt: true,
+                      text: {
+                        actionMessage: "Разрешите уведомления, чтобы получать напоминания о записи",
+                        acceptButton: "Разрешить",
+                        cancelButton: "Позже"
+                      },
+                      delay: {
+                        pageViews: 1,
+                        timeDelay: 5
+                      }
+                    }
+                  ]
+                }
+              },
+              welcomeNotification: {
+                title: "Уведомления подключены!",
+                message: "Вы будете получать напоминания о своей записи 🎉"
+              }
+            });
+          } catch (e) {
+            console.warn("OneSignal initialization blocked or failed:", e);
+          }
+        });
+      }
+    </script>
+    <script>
+      // Early suppression of TronLink extension errors
+      (function() {
+        const suppress = (e) => {
+          const message = e.message || (e.error && e.error.message) || (e.reason && (e.reason.message || e.reason));
+          if (message && typeof message === 'string' && (
+            message.includes('tronlinkParams') || 
+            message.includes('TronLink') || 
+            message.includes('Can only be used on: https://ai.studio')
+          )) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            return true;
+          }
+          return false;
+        };
+        window.addEventListener('error', suppress, true);
+        window.addEventListener('unhandledrejection', suppress, true);
+        
+        const originalError = console.error;
+        console.error = function(...args) {
+          const message = args.map(arg => arg instanceof Error ? arg.message : String(arg)).join(' ');
+          if (
+            message.includes('tronlinkParams') || 
+            message.includes('TronLink') || 
+            message.includes('Can only be used on: https://ai.studio')
+          ) {
+            return;
+          }
+          originalError.apply(console, args);
+        };
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
