@@ -1,0 +1,597 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db?connection_limit=1"
+}
+
+model Business {
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
+  phone                 String?
+  address               String?
+  workingHours          Json      // {"mon": {"start": "10:00", "end": "20:00"}, ...}
+  bookingRulesEnabled   Boolean   @default(false)
+  slotDuration          Int       @default(30)
+  autoConfirmBookings   Boolean   @default(true)
+  requireApprovalFor    String    @default("[]") // JSON array of service IDs
+  smsEnabled            Boolean   @default(false)
+  smsTemplate           String?
+  bookingLeadTimeHours  Int       @default(2)
+  maxBookingDaysAhead   Int       @default(30)
+  
+  // Onboarding & Info
+  industry              String?
+  subcategory           String?
+  employeeCount         String?
+  locationCount         String?
+  ownerRole             String?
+  logo                  String?
+  description           String?
+  city                  String?
+  postalCode            String?
+  timezone              String?   @default("Europe/Moscow")
+  currency              String?   @default("RUB")
+  isPublished           Boolean   @default(false)
+
+  // Геолокация для карты
+  latitude    Float?   // Широта: 55.7558
+  longitude   Float?   // Долгота: 37.6173
+  district    String?  // "Центральный район"
+  
+  // Категоризация
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  
+  // Маркетплейс
+  featuredUntil   DateTime? // Платное продвижение
+  coverImage      String?  // Обложка
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Payment settings
+  paymentEnabled        Boolean   @default(false)
+  paymentProvider       String?   // 'yookassa'
+  yukassaShopId         String?
+  yukassaSecretKey      String?
+
+  // Prepayment settings
+  requirePrepayment     Boolean   @default(false)
+  prepaymentPercent     Int       @default(20)
+
+  // Loyalty settings
+  loyaltyEnabled        Boolean   @default(false)
+  loyaltyPercent        Int       @default(10)
+  loyaltyMaxSpend       Int       @default(50)
+  loyaltyExpireDays     Int?
+
+  staff         Staff[]
+  services      Service[]
+  bookings      Booking[]
+  waitlist      Waitlist[]
+  promocodes    Promocode[]
+  reviews       Review[]
+  users         User[]
+  subscriptions Subscription[]
+  giftCertificates GiftCertificate[]
+  clientNotes   ClientNote[]
+  loyaltyTransactions LoyaltyTransaction[]
+  posts         BusinessPost[]
+  
+  // Referral settings
+  isReferralEnabled      Boolean   @default(false)
+  referralRewardPercent  Float     @default(10.0)
+
+  follows        Follow[]
+  recommendations BusinessRecommendation[]
+  referralLinks  ReferralLink[]
+}
+
+model Staff {
+  id              String           @id @default(cuid())
+  businessId      String
+  name            String
+  phone           String?
+  workingHours    Json?            // Optional override for staff specific hours
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  business        Business         @relation(fields: [businessId], references: [id])
+  bookings        Booking[]
+  portfolioPhotos PortfolioPhoto[]
+  reviews         Review[]
+  posts           BusinessPost[]
+}
+
+model Service {
+  id                   String    @id @default(cuid())
+  businessId           String
+  name                 String
+  description          String?
+  durationMinutes      Int
+  price                Float
+  isActive             Boolean   @default(true)
+  sortOrder            Int       @default(0)
+  paddingAfter         Int       @default(0)
+  isGroupService       Boolean   @default(false)
+  maxParticipants      Int?
+  enableDynamicPricing Boolean   @default(false)
+  pricingRules         Json?     // { peak: { days: [5,6], hours: [17,20], multiplier: 1.2 } }
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  business      Business   @relation(fields: [businessId], references: [id])
+  bookings      Booking[]
+  waitlist      Waitlist[]
+  subscriptions Subscription[]
+  posts         BusinessPost[]
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  phone       String?  @unique
+  password    String?  // Может быть null если вход через соцсети
+  name        String?
+  avatar      String?
+  
+  // OAuth IDs
+  yandexId    String?  @unique
+  vkId        String?  @unique
+  telegramId  String?  @unique
+  
+  businessId  String?
+  role        String   @default("owner")
+  createdAt   DateTime @default(now())
+  
+  business Business? @relation(fields: [businessId], references: [id])
+}
+
+model Client {
+  id              String   @id @default(cuid())
+  phone           String   @unique
+  name            String?
+  email           String?
+  password        String?  // null = незарегистрированный клиент
+  isRegistered    Boolean  @default(false)
+  
+  // Telegram
+  telegramChatId  String?
+  telegramUsername String?
+  notificationMethod String @default("sms") // 'sms' | 'telegram' | 'both'
+  
+  loyaltyPoints   Int      @default(0)
+  referralSharePercent Float   @default(50.0)
+  referralPoints       Int     @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bookings        Booking[]
+  waitlist        Waitlist[]
+  reviews         Review[]
+  promocodeUsages PromocodeUsage[]
+  subscriptionPurchases SubscriptionPurchase[]
+  telegramLinkRequests TelegramLinkRequest[]
+  notes           ClientNote[]
+  loyaltyTransactions LoyaltyTransaction[]
+  postLikes       PostLike[]
+  postComments    PostComment[]
+  postViews       PostView[]
+
+  follows        Follow[]
+  recommendations BusinessRecommendation[]
+  referralLinks  ReferralLink[]
+}
+
+model ClientNote {
+  id          String   @id @default(cuid())
+  clientId    String
+  businessId  String
+  authorId    String   // Кто написал заметку
+  text        String
+  createdAt   DateTime @default(now())
+  
+  client   Client   @relation(fields: [clientId], references: [id])
+  business Business @relation(fields: [businessId], references: [id])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Booking {
+  id                String        @id @default(cuid())
+  businessId        String
+  clientId          String
+  serviceId         String
+  staffId           String
+  startTime         DateTime
+  endTime           DateTime
+  status            BookingStatus @default(PENDING)
+  source            String        @default("WIDGET") // WIDGET, CHATBOT, CRM, API
+  confirmHash       String        @unique @default(cuid())
+  
+  // Recurring bookings
+  recurringGroupId  String?
+  recurrenceIndex   Int?
+  recurrenceTotal   Int?
+  recurrenceRule    Json?         // { type: 'weekly', interval: 1, endDate: '...' }
+  
+  // Denormalized data for quick access
+  clientName        String
+  clientPhone       String
+  clientEmail       String?
+  
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Family accounts / Booking for others
+  bookedForSelf     Boolean       @default(true)
+  bookedById        String?       // ID того, кто записал (если клиент в базе)
+  bookedByName      String?
+  bookedByPhone     String?
+  bookedByEmail     String?
+  relationship      String?       // 'parent', 'spouse', 'assistant', 'friend', 'other'
+
+  // Rebooking
+  rebookReminderSent Boolean      @default(false)
+
+  // Payment info
+  totalPrice        Float?
+  prepaidAmount     Float         @default(0)
+  discountAmount    Float         @default(0)
+  paymentStatus     String        @default("unpaid") // unpaid, partial, paid, refunded
+  paymentId         String?
+  paymentUrl        String?
+
+  // Subscriptions
+  paidBySubscription     Boolean @default(false)
+  subscriptionPurchaseId String?
+
+  // Loyalty
+  pointsEarned      Int      @default(0)
+  pointsSpent       Int      @default(0)
+
+  // Referral tracking
+  referralLinkId    String?
+  referralRewardApplied Boolean @default(false)
+  referralSplitPercent  Int?    // На сколько % в сторону реферера был настроен сплит
+
+  business      Business       @relation(fields: [businessId], references: [id])
+  client        Client         @relation(fields: [clientId], references: [id])
+  service       Service        @relation(fields: [serviceId], references: [id])
+  staff         Staff          @relation(fields: [staffId], references: [id])
+  audits        BookingAudit[]
+  review        Review?
+  promocodeUsage PromocodeUsage?
+  subscriptionPurchase SubscriptionPurchase? @relation(fields: [subscriptionPurchaseId], references: [id])
+  loyaltyTransactions  LoyaltyTransaction[]
+
+  @@unique([staffId, startTime])
+}
+
+model Subscription {
+  id              String   @id @default(cuid())
+  businessId      String
+  name            String   // "Абонемент на 10 стрижек"
+  serviceId       String   // К какой услуге привязан
+  totalVisits     Int      // 10 визитов
+  price           Float    // 12000 ₽
+  originalPrice   Float    // 15000 ₽ (сумма по отдельности)
+  validDays       Int      @default(365) // Срок действия в днях
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  
+  business  Business  @relation(fields: [businessId], references: [id])
+  service   Service   @relation(fields: [serviceId], references: [id])
+  purchases SubscriptionPurchase[]
+}
+
+model SubscriptionPurchase {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  clientId        String
+  usedVisits      Int      @default(0)
+  totalVisits     Int
+  expiresAt       DateTime
+  paymentStatus   String   @default("paid") // pending, paid, expired
+  createdAt       DateTime @default(now())
+  
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+  client       Client       @relation(fields: [clientId], references: [id])
+  bookings     Booking[]
+}
+
+model GiftCertificate {
+  id              String   @id @default(cuid())
+  businessId      String
+  code            String   @unique // "GIFT-ABC123"
+  amount          Float    // 5000 ₽
+  remainingAmount Float    // Сколько осталось
+  purchasedById   String?  // Кто купил
+  purchasedByName String?
+  recipientName   String?  // Кому подарок
+  recipientPhone  String?
+  recipientEmail  String?
+  expiresAt       DateTime
+  isUsed          Boolean  @default(false) // Полностью использован
+  createdAt       DateTime @default(now())
+  
+  business Business @relation(fields: [businessId], references: [id])
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String  // "Барбершопы"
+  namePlural  String  // "Барбершопов"
+  slug        String  @unique // "barbershops"
+  icon        String  // "✂️"
+  color       String  // "#3B82F6" (для маркера на карте)
+  parentId    String?
+  sortOrder   Int @default(0)
+  isActive    Boolean @default(true)
+  
+  parent     Category?  @relation("Sub", fields: [parentId], references: [id])
+  children   Category[] @relation("Sub")
+  businesses Business[]
+  
+  createdAt  DateTime @default(now())
+}
+
+model TelegramLinkRequest {
+  id        String   @id @default(cuid())
+  clientId  String
+  code      String   @unique // Уникальный код для ссылки
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  client Client @relation(fields: [clientId], references: [id])
+}
+
+model Waitlist {
+  id            String   @id @default(cuid())
+  businessId    String
+  serviceId     String
+  staffId       String?
+  requestedDate DateTime
+  requestedTime String
+  clientId      String
+  notified      Boolean  @default(false)
+  claimHash     String   @unique @default(cuid())
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime? 
+
+  business Business @relation(fields: [businessId], references: [id])
+  service  Service  @relation(fields: [serviceId], references: [id])
+  client   Client   @relation(fields: [clientId], references: [id])
+}
+
+model PortfolioPhoto {
+  id        String   @id @default(cuid())
+  staffId   String
+  imageUrl  String
+  caption   String?
+  category  String? 
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+  
+  staff Staff @relation(fields: [staffId], references: [id])
+}
+
+model BookingAudit {
+  id        String   @id @default(cuid())
+  bookingId String
+  action    String   // created, rescheduled, confirmed, cancelled, completed
+  actor     String?  // client/staff/system
+  actorId   String?
+  oldData   Json?
+  newData   Json?
+  createdAt DateTime @default(now())
+  
+  booking Booking @relation(fields: [bookingId], references: [id])
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  bookingId  String
+  type       String    // "sms" or "email"
+  recipient  String
+  message    String
+  status     String    // "sent", "failed", "pending"
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Promocode {
+  id                 String   @id @default(cuid())
+  businessId         String
+  code               String   @unique
+  discountType       String   // 'percent' | 'fixed'
+  discountValue      Float
+  minOrderAmount     Float?
+  maxUses            Int?
+  usedCount          Int      @default(0)
+  validFrom          DateTime
+  validUntil         DateTime?
+  applicableServices String   @default("[]") // JSON array of service IDs
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+  usages   PromocodeUsage[]
+}
+
+model PromocodeUsage {
+  id             String   @id @default(cuid())
+  promocodeId    String
+  bookingId      String   @unique
+  clientId       String
+  discountAmount Float
+  usedAt         DateTime @default(now())
+
+  promocode Promocode @relation(fields: [promocodeId], references: [id])
+  booking   Booking   @relation(fields: [bookingId], references: [id])
+  client    Client    @relation(fields: [clientId], references: [id])
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(cuid())
+  clientId    String
+  businessId  String
+  bookingId   String?
+  type        String   // "EARN" | "SPEND" | "EXPIRE" | "MANUAL"
+  points      Int      // + earned, - spent
+  description String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+
+  client   Client    @relation(fields: [clientId], references: [id])
+  business Business  @relation(fields: [businessId], references: [id])
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+}
+
+model Review {
+  id            String   @id @default(cuid())
+  bookingId     String   @unique
+  clientId      String
+  businessId    String
+  staffId       String?
+  rating        Int      // 1-5
+  text          String?
+  photos        String   @default("[]") // JSON array of URLs
+  status        String   @default("pending") // pending, approved, rejected
+  businessReply String?
+  createdAt     DateTime @default(now())
+
+  booking  Booking  @relation(fields: [bookingId], references: [id])
+  client   Client   @relation(fields: [clientId], references: [id])
+  business Business @relation(fields: [businessId], references: [id])
+  staff    Staff?   @relation(fields: [staffId], references: [id])
+}
+
+model BusinessPost {
+  id            String   @id @default(cuid())
+  businessId    String
+  authorId      String?  // staffId
+  type          String   // "IMAGE" | "VIDEO" | "TEXT" | "VOICE" | "CAROUSEL"
+  text          String?
+  mediaUrls     String   @default("[]") // JSON array of strings
+  voiceUrl      String?
+  voiceDuration Int?
+  tags          String   @default("[]") // JSON array of strings
+  serviceId     String?
+  viewsCount    Int      @default(0)
+  likesCount    Int      @default(0)
+  isPinned      Boolean  @default(false)
+  isPublished   Boolean  @default(true)
+  isPublic      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  business Business      @relation(fields: [businessId], references: [id])
+  author   Staff?         @relation(fields: [authorId], references: [id])
+  service  Service?       @relation(fields: [serviceId], references: [id])
+  likes    PostLike[]
+  comments PostComment[]
+  views    PostView[]
+}
+
+model PostView {
+  id        String   @id @default(cuid())
+  postId    String
+  clientId  String?
+  ipHash    String
+  createdAt DateTime @default(now())
+
+  post   BusinessPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  client Client?       @relation(fields: [clientId], references: [id])
+
+  @@unique([postId, ipHash])
+  @@unique([postId, clientId])
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  clientId  String?
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  post   BusinessPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  client Client?       @relation(fields: [clientId], references: [id])
+
+  @@unique([postId, clientId])
+  @@unique([postId, ipHash])
+}
+
+model PostComment {
+  id        String   @id @default(cuid())
+  postId    String
+  clientId  String?
+  text      String
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  post   BusinessPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  client Client?       @relation(fields: [clientId], references: [id])
+}
+
+model Follow {
+  id            String   @id @default(cuid())
+  clientId      String
+  businessId    String
+  createdAt     DateTime @default(now())
+
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, businessId])
+}
+
+model BusinessRecommendation {
+  id         String   @id @default(cuid())
+  clientId   String
+  businessId String
+  createdAt  DateTime @default(now())
+
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, businessId])
+}
+
+model ReferralLink {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  clientId    String
+  businessId  String
+  createdAt   DateTime @default(now())
+
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  visits      ReferralVisit[]
+}
+
+model ReferralVisit {
+  id          String   @id @default(cuid())
+  referralId  String
+  newClientId String?
+  createdAt   DateTime @default(now())
+
+  referral    ReferralLink @relation(fields: [referralId], references: [id], onDelete: Cascade)
+}
