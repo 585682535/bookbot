@@ -23,10 +23,10 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 const prisma = new PrismaClient();
 
-// Configure SQLite WAL (Write-Ahead Logging) mode and connection timeouts to prevent locks and corruption
-prisma.$executeRawUnsafe('PRAGMA journal_mode=WAL;')
-  .then(() => prisma.$executeRawUnsafe('PRAGMA busy_timeout=5000;'))
-  .then(() => console.log('SQLite configured with WAL mode and 5000ms busy timeout successfully.'))
+// Configure SQLite TRUNCATE mode and transaction locking timeouts to prevent locks and corruptions
+prisma.$executeRawUnsafe('PRAGMA journal_mode=TRUNCATE;')
+  .then(() => prisma.$executeRawUnsafe('PRAGMA busy_timeout=10000;'))
+  .then(() => console.log('SQLite configured with TRUNCATE mode and 10000ms busy timeout successfully.'))
   .catch((err) => console.error('Failed to configure SQLite pragmas:', err));
 const REDIS_URL = process.env.REDIS_URL;
 
